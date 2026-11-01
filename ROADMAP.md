@@ -8,12 +8,11 @@ Meander grows slowly: each release adds one layer and keeps it solid.
   `CuQuaternion`, `CuTwist2`, and fixed-capacity scan / point cloud payloads;
   pose composition/inversion and exact constant-twist integration (odometry).
 - `meander-grid`: fixed-size 2D occupancy grid and 3D voxel grid with
-  world↔cell geometry, ray casting for sensor insertion, and voxel → 2D
+  world↔cell geometry, clamped probabilistic log-odds ray updates, and voxel → 2D
   projection.
 
 ## Later (unordered, not committed)
 
-- Probabilistic (log-odds) occupancy updates.
 - Costmap layers: static, obstacle, inflation.
 - Drive kinematics: differential drive, then omnidirectional.
 - Global planner contract and an A* grid planner.

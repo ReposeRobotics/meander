@@ -26,3 +26,6 @@ meander-core = { version = "0.1.0", path = "../meander_core", default-features =
 [features]
 default = ["std"]
 std = ["cu29/std", "meander-core/std", "bincode/std", "serde/std"]
+
+[dev-dependencies]
+ron = "0.12"
