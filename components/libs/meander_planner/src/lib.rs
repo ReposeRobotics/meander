@@ -44,8 +44,11 @@ extern crate alloc;
 mod params;
 mod planner;
 mod report;
+mod task;
 
 pub use params::CuPlannerParams;
+pub use params::CuPlannerTaskParams;
 pub use planner::CuBidirectionalDijkstra;
 pub use report::CuPlanReport;
 pub use report::CuPlanStatus;
+pub use task::CuPlannerTask;

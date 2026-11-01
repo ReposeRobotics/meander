@@ -23,10 +23,11 @@ libm = { workspace = true }
 serde = { workspace = true }
 meander-core = { version = "0.1.0", path = "../meander_core", default-features = false }
 meander-grid = { version = "0.1.0", path = "../meander_grid", default-features = false }
+meander-costmap = { version = "0.1.0", path = "../meander_costmap", default-features = false }
 
 [features]
 default = ["std"]
-std = ["cu29/std", "meander-core/std", "meander-grid/std", "bincode/std", "serde/std"]
+std = ["cu29/std", "meander-core/std", "meander-grid/std", "meander-costmap/std", "bincode/std", "serde/std"]
 
 [dev-dependencies]
 ron = "0.12"

@@ -1,8 +1,11 @@
 //! Planner configuration: one params struct, identical in Rust and RON.
 
+use alloc::string::String;
 use cu29::prelude::*;
 use cu29::units::si::f64::Length;
 use cu29::units::si::length::meter;
+use meander_core::CuPose2;
+use meander_costmap::CuCostmapParams;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -122,5 +125,52 @@ mod tests {
         let partial: CuPlannerParams = ron::from_str("(cost_weight: 0.0)").unwrap();
         assert_eq!(partial.lethal_cost, CuPlannerParams::default().lethal_cost);
         assert!(ron::from_str::<CuPlannerParams>("(cost_weight: 1.0, bogus: 1)").is_err());
+    }
+}
+
+/// Parameters of [`CuPlannerTask`](crate::CuPlannerTask): planner and costmap
+/// settings, the goal, and the Nav2 map to plan on.
+///
+/// ```ron
+/// config: {
+///     "map_path": "target/waypoint-mapping/map.yaml",
+///     "goal": (x: 2.8, y: 2.8, theta: 0.0),
+/// }
+/// ```
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, Reflect)]
+#[serde(default, deny_unknown_fields)]
+pub struct CuPlannerTaskParams {
+    /// Bidirectional Dijkstra settings.
+    pub planner: CuPlannerParams,
+    /// Obstacle inflation applied to the loaded map.
+    pub costmap: CuCostmapParams,
+    /// Goal pose in the map frame.
+    pub goal: CuPose2,
+    /// Nav2 map YAML (`std` only) loaded and inflated in `CuTask::new`.
+    /// `None` is only usable programmatically via
+    /// [`CuPlannerTask::from_costmap`](crate::CuPlannerTask::from_costmap).
+    pub map_path: Option<String>,
+}
+
+impl CuPlannerTaskParams {
+    /// Rejects invalid planner/costmap settings, a non-finite goal, and an
+    /// empty `map_path`.
+    pub fn validate(&self) -> CuResult<()> {
+        self.planner.validate()?;
+        self.costmap.validate()?;
+        let goal = self.goal;
+        if !goal.x.get::<meter>().is_finite()
+            || !goal.y.get::<meter>().is_finite()
+            || !goal
+                .theta
+                .get::<cu29::units::si::angle::radian>()
+                .is_finite()
+        {
+            return Err(CuError::from("meander-planner: goal must be finite"));
+        }
+        if self.map_path.as_deref() == Some("") {
+            return Err(CuError::from("meander-planner: map_path must not be empty"));
+        }
+        Ok(())
     }
 }

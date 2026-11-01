@@ -1,0 +1,62 @@
+(
+    runtime: (rate_target_hz: 50),
+    logging: (slab_size_mib: 64, keyframe_interval: 100),
+    tasks: [
+        (
+            id: "planner",
+            type: "meander_planner::CuPlannerTask<200, 200, 2048>",
+            // The CuPath2<2048> payload is ~48 KiB per CopperList; poses and
+            // twists stay logged for replay, the cached path does not need
+            // to be recorded every cycle.
+            logging: (enabled: false),
+            config: {
+                "map_path": "target/waypoint-mapping/map.yaml",
+                "goal": (x: 2.8, y: 2.8, theta: 0.0),
+            },
+        ),
+        (
+            id: "controller",
+            type: "meander_controller::CuPurePursuitTask<2048>",
+            config: {},
+        ),
+        (
+            id: "recorder",
+            type: "tasks::CuNavigationRecorder",
+            config: {
+                "map_path": "target/waypoint-mapping/map.yaml",
+                "output_path": "target/navigate-to-goal/navigation.png",
+            },
+        ),
+    ],
+    bridges: [
+        (
+            id: "sim",
+            type: "meander_example_diff_drive::CuDiffDriveSimBridge",
+            config: {
+                "start": (x: -3.2, y: -3.2, theta: 0.0),
+                "sample_period": 0.02,
+            },
+            channels: [
+                Rx(id: "pose", msg: "meander_core::CuPose2"),
+                Tx(id: "twist", msg: "meander_core::CuTwist2"),
+            ],
+        ),
+    ],
+    cnx: [
+        (src: "sim/pose", dst: "planner", msg: "meander_core::CuPose2"),
+        (src: "sim/pose", dst: "controller", msg: "meander_core::CuPose2"),
+        (src: "sim/pose", dst: "recorder", msg: "meander_core::CuPose2"),
+        (
+            src: "planner",
+            dst: "controller",
+            msg: "meander_core::CuPath2<2048>",
+        ),
+        (
+            src: "planner",
+            dst: "recorder",
+            msg: "meander_core::CuPath2<2048>",
+        ),
+        (src: "controller", dst: "sim/twist", msg: "meander_core::CuTwist2"),
+        (src: "controller", dst: "recorder", msg: "meander_core::CuTwist2"),
+    ],
+)

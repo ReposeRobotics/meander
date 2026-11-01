@@ -18,6 +18,17 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- `meander-planner`: `CuPlannerTask<W, H, N>` Copper task (with
+  `CuPlannerTaskParams`) that loads and inflates a Nav2 map, plans once to
+  the configured goal, and republishes the cached `CuPath2<N>`.
+- `meander-controller`: `CuPurePursuitTask<N>` Copper task wrapping regulated
+  pure pursuit (pose + `CuPath2<N>` in, `CuTwist2` out).
+- `examples/diff_drive`: `CuDiffDriveSimBridge`, a Copper bridge simulating
+  the diff-drive base (twist in, pose out) with `CuDiffDriveSimParams`.
+- `examples/navigate_to_goal` is now a Copper application
+  (`copperconfig.ron` + `#[copper_runtime]`) with unified `.copper` logging
+  and a `logreader` binary, instead of a standalone simulation loop.
+
 - `examples/navigate_to_goal`: load a saved Nav2 map, inflate it with
   `meander-costmap`, plan to a goal with `meander-planner`'s bidirectional
   Dijkstra, follow the `CuPath2` with `meander-controller`'s pure pursuit, and
