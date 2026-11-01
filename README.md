@@ -10,6 +10,7 @@ Meander is early. Version 0.1 covers the foundations only:
 |---|---|
 | `meander-core` | Units-typed 2D/3D points, 2D poses and twists, odometry integration |
 | `meander-grid` | Fixed-size 2D occupancy grids and 3D voxel grids, ray casting, voxel → 2D projection |
+| `meander-mapping` | Copper tasks building log-odds 2D/3D maps from poses + laser scans or point clouds, saving Nav2 maps |
 
 All crates are `no_std` and never allocate on the hot path. Grid sizes are
 const generics, so a map's memory is known at compile time.

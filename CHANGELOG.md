@@ -18,6 +18,16 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- `meander-mapping`: `CuScanMappingTask` (`CuPose2` + `CuLaserScan<N>` → 2D
+  log-odds map) and `CuCloudMappingTask` (`CuPose3` + `CuPointCloud3<N>` → 3D
+  voxel map), built on the allocation-free `CuScanMapper2` / `CuCloudMapper3`.
+  Sensor mount pose, `max_range`, no-return clearing and the 3D → 2D height
+  band are configured through `CuMappingParams`; each observation publishes a
+  `CuMapUpdateReport`; `freeze`/`thaw` round-trip the whole map for replay;
+  `save_path` writes a Nav2 PGM + YAML map on `stop`.
+- `meander-grid`: `load_log_odds_rows` on both grids restores a saved
+  log-odds state, validating every value against the clamp range.
+
 - `meander-core`: unit quaternions, spatial poses and fixed-capacity laser scan /
   point cloud payloads with allocation-free transforms into caller-owned buffers.
 - `meander-grid`: allocation-free trinary P5 map encoding/decoding, typed Nav2
