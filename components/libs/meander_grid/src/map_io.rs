@@ -463,7 +463,9 @@ pub fn decode_pgm<const W: usize, const H: usize>(
         return Err(error("missing PGM raster separator"));
     }
     pos += 1;
-    if separator == b'\r' && input.get(pos) == Some(&b'\n') {
+    // CR then LF is a CRLF separator only if the raster is one byte too long;
+    // otherwise the LF is the first pixel (value 10).
+    if separator == b'\r' && input.get(pos) == Some(&b'\n') && input.len() - pos == count + 1 {
         pos += 1;
     }
     let pixels = input
@@ -475,8 +477,10 @@ pub fn decode_pgm<const W: usize, const H: usize>(
     }
     for row in 0..H {
         for x in 0..W {
-            let shade = f64::from(pixels[row * W + x]) / max as f64;
-            let probability = if metadata.negate { shade } else { 1.0 - shade };
+            // Subtract in integers before dividing so decimal thresholds compare exactly.
+            let pixel = usize::from(pixels[row * W + x]);
+            let level = if metadata.negate { pixel } else { max - pixel };
+            let probability = level as f64 / max as f64;
             let state = if probability >= metadata.occupied_thresh {
                 CuOccupancy::Occupied
             } else if probability <= metadata.free_thresh {
@@ -698,6 +702,29 @@ mod tests {
         for x in 0..3 {
             assert_eq!(output.get(CuCell2::new(x, 0)), Some(CuOccupancy::Free));
         }
+    }
+
+    #[test]
+    fn test_cr_separator_followed_by_lf_pixel() {
+        let mut m = metadata();
+        m.negate = true;
+        let mut output = grid::<1, 1>(&m);
+        // A lone CR separator, then one pixel of value 10 (LF): not a CRLF.
+        decode_pgm(b"P5\n1 1\n255\r\n", &m, &mut output).unwrap();
+        assert_eq!(output.get(CuCell2::new(0, 0)), Some(CuOccupancy::Free));
+    }
+
+    #[test]
+    fn test_decimal_thresholds_compare_exactly() {
+        let mut m = metadata();
+        m.negate = false;
+        m.free_thresh = 0.3;
+        m.occupied_thresh = 0.9;
+        let mut output = grid::<2, 1>(&m);
+        // max=100: pixel 70 is p=0.3 (Free at equality), pixel 10 is p=0.9 (Occupied).
+        decode_pgm(b"P5\n2 1\n100\n\x46\x0a", &m, &mut output).unwrap();
+        assert_eq!(output.get(CuCell2::new(0, 0)), Some(CuOccupancy::Free));
+        assert_eq!(output.get(CuCell2::new(1, 0)), Some(CuOccupancy::Occupied));
     }
 
     #[test]
