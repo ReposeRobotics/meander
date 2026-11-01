@@ -21,6 +21,9 @@ All notable changes to this project are documented here. The format follows
 - `meander-core`: `CuPath2<N>`, a fixed-capacity planar path payload (the
   planner → controller message) with `poses()`, `set()` and `length()`.
 
+- `meander-costmap`: fixed-size Nav2 costs with allocation-free exact Euclidean
+  inflation, typed robot/inflation radii, and configurable unknown handling.
+
 - `examples/waypoint_mapping`: a diff-drive robot drives through waypoints in a
   room with obstacles, maps it with a simulated lidar through
   `CuScanMapper2`, and saves a Nav2 map plus a PNG picture with its path.
