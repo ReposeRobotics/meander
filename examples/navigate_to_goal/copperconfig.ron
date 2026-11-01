@@ -27,6 +27,14 @@
                 "output_path": "target/navigate-to-goal/navigation.png",
             },
         ),
+        (
+            id: "telemetry",
+            type: "telemetry::CuTelemetrySink",
+            config: {
+                "map_path": "target/waypoint-mapping/map.yaml",
+                "port": 18765,
+            },
+        ),
     ],
     bridges: [
         (
@@ -34,7 +42,6 @@
             type: "meander_example_diff_drive::CuDiffDriveSimBridge",
             config: {
                 "start": (x: -3.2, y: -3.2, theta: 0.0),
-                "sample_period": 0.02,
             },
             channels: [
                 Rx(id: "pose", msg: "meander_core::CuPose2"),
@@ -58,5 +65,12 @@
         ),
         (src: "controller", dst: "sim/twist", msg: "meander_core::CuTwist2"),
         (src: "controller", dst: "recorder", msg: "meander_core::CuTwist2"),
+        (src: "sim/pose", dst: "telemetry", msg: "meander_core::CuPose2"),
+        (
+            src: "planner",
+            dst: "telemetry",
+            msg: "meander_core::CuPath2<2048>",
+        ),
+        (src: "controller", dst: "telemetry", msg: "meander_core::CuTwist2"),
     ],
 )

@@ -23,12 +23,16 @@
 //! the unified log `target/navigate-to-goal/log.copper`.
 
 mod tasks;
+mod telemetry;
 
+use cu29::curuntime::LoopRateLimiter;
 use cu29::prelude::*;
 
-/// CopperLists to run: 60 s at the 50 Hz graph rate. The robot reaches the
-/// goal in ~21 s and then holds position on zero twists.
+/// CopperLists to run: 60 s at the graph rate. The robot reaches the goal
+/// in ~21 s and then holds position on zero twists.
 const ITERATIONS: usize = 3000;
+/// Loop rate; must match `runtime.rate_target_hz` in `copperconfig.ron`.
+const RATE_HZ: u64 = 50;
 
 #[copper_runtime(config = "copperconfig.ron")]
 struct NavigateApp {}
@@ -45,6 +49,9 @@ fn main() -> CuResult<()> {
 }
 
 fn run() -> CuResult<()> {
+    // The unified logger cannot create its slab in a missing directory.
+    std::fs::create_dir_all("target/navigate-to-goal")
+        .map_err(|e| CuError::new_with_cause("cannot create output dir", e))?;
     let app = NavigateApp::builder()
         .with_log_path(
             std::path::Path::new("target/navigate-to-goal/log.copper"),
@@ -52,7 +59,16 @@ fn run() -> CuResult<()> {
         )?
         .build()?;
     let mut running = app.start()?;
-    let result = (0..ITERATIONS).try_for_each(|_| running.run_one_iteration());
+    // Pace the loop with the runtime's own limiter on the robot clock, the
+    // same policy `run_until_shutdown` uses: 50 Hz of wall time, so the
+    // simulated robot moves in real time and Studio can follow it live.
+    // (`run_one_iteration` alone would fast-forward as fast as the CPU can.)
+    let clock = running.clock();
+    let mut limiter = LoopRateLimiter::from_rate_target_hz(RATE_HZ, &clock)?;
+    let result = (0..ITERATIONS).try_for_each(|_| {
+        limiter.limit(&clock);
+        running.run_one_iteration()
+    });
     let stopped = running.stop().map(|_| ()).map_err(|fault| fault.error);
     result.and(stopped)?;
     println!("wrote target/navigate-to-goal/log.copper");
