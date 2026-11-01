@@ -20,15 +20,48 @@ use serde::Serialize;
 /// A unit quaternion, with dimensionless scalar `w` and vector `x/y/z` components.
 ///
 /// Rotations are right-handed and map child coordinates into parent coordinates.
-/// Serialized components must also describe a unit quaternion.
-#[derive(Debug, Clone, Copy, PartialEq, Encode, Decode, Serialize, Deserialize, Reflect)]
-#[serde(deny_unknown_fields)]
+/// Deserializing and decoding go through the same validation as
+/// [`CuQuaternion::new`]: zero or non-finite components are rejected and
+/// non-unit components are normalized.
+#[derive(Debug, Clone, Copy, PartialEq, Encode, Serialize, Deserialize, Reflect)]
+#[serde(try_from = "RawQuaternion")]
 pub struct CuQuaternion {
     w: f64,
     x: f64,
     y: f64,
     z: f64,
 }
+
+/// Unvalidated wire form of [`CuQuaternion`].
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawQuaternion {
+    w: f64,
+    x: f64,
+    y: f64,
+    z: f64,
+}
+
+impl TryFrom<RawQuaternion> for CuQuaternion {
+    type Error = &'static str;
+
+    fn try_from(raw: RawQuaternion) -> Result<Self, Self::Error> {
+        Self::from_wire(raw.w, raw.x, raw.y, raw.z)
+    }
+}
+
+impl<Context> Decode<Context> for CuQuaternion {
+    fn decode<D: bincode::de::Decoder<Context = Context>>(
+        decoder: &mut D,
+    ) -> Result<Self, bincode::error::DecodeError> {
+        let w = f64::decode(decoder)?;
+        let x = f64::decode(decoder)?;
+        let y = f64::decode(decoder)?;
+        let z = f64::decode(decoder)?;
+        Self::from_wire(w, x, y, z).map_err(bincode::error::DecodeError::Other)
+    }
+}
+bincode::impl_borrow_decode!(CuQuaternion);
 
 impl Default for CuQuaternion {
     fn default() -> Self {
@@ -42,6 +75,17 @@ impl Default for CuQuaternion {
 }
 
 impl CuQuaternion {
+    /// Validates components from serde or bincode. Already-unit values are kept
+    /// bit-exact so encode/decode round trips are lossless; others are normalized.
+    fn from_wire(w: f64, x: f64, y: f64, z: f64) -> Result<Self, &'static str> {
+        let norm2 = w * w + x * x + y * y + z * z;
+        if [w, x, y, z].iter().all(|v| v.is_finite()) && libm::fabs(norm2 - 1.0) <= 1e-12 {
+            return Ok(Self { w, x, y, z });
+        }
+        Self::new(w, x, y, z)
+            .map_err(|_| "meander-core: quaternion components must be finite and nonzero")
+    }
+
     /// Normalizes finite, nonzero dimensionless components into a unit quaternion.
     pub fn new(w: f64, x: f64, y: f64, z: f64) -> CuResult<Self> {
         let scale = w.abs().max(x.abs()).max(y.abs()).max(z.abs());
@@ -349,5 +393,35 @@ mod tests {
         );
         let text = ron::to_string(&pose).unwrap();
         assert_eq!(ron::from_str::<CuPose3>(&text).unwrap(), pose);
+    }
+
+    #[cfg(feature = "std")]
+    #[test]
+    fn test_quaternion_ron_validates() {
+        // Non-unit input is normalized, so rotate-then-inverse is the identity again.
+        let q: CuQuaternion = ron::from_str("(w: 1.0, x: 0.0, y: 0.0, z: 1.0)").unwrap();
+        let s = core::f64::consts::FRAC_1_SQRT_2;
+        assert_eq!(q, CuQuaternion::new(s, 0.0, 0.0, s).unwrap());
+        assert!(ron::from_str::<CuQuaternion>("(w: 0.0, x: 0.0, y: 0.0, z: 0.0)").is_err());
+        assert!(ron::from_str::<CuQuaternion>("(w: 1.0, x: 0.0, y: 0.0, z: 0.0, v: 1.0)").is_err());
+    }
+
+    #[test]
+    fn test_quaternion_bincode_validates() {
+        let config = bincode::config::standard();
+        let unit = CuQuaternion::from_rpy(rad(0.3), rad(-0.2), rad(1.1)).unwrap();
+        let mut buf = [0u8; 64];
+        let n = bincode::encode_into_slice(unit, &mut buf, config).unwrap();
+        let (back, _): (CuQuaternion, usize) =
+            bincode::decode_from_slice(&buf[..n], config).unwrap();
+        assert_eq!(back, unit);
+
+        let n =
+            bincode::encode_into_slice((0.0f64, 0.0f64, 0.0f64, 0.0f64), &mut buf, config).unwrap();
+        assert!(bincode::decode_from_slice::<CuQuaternion, _>(&buf[..n], config).is_err());
+        let n =
+            bincode::encode_into_slice((2.0f64, 0.0f64, 0.0f64, 0.0f64), &mut buf, config).unwrap();
+        let (q, _): (CuQuaternion, usize) = bincode::decode_from_slice(&buf[..n], config).unwrap();
+        assert_eq!(q, CuQuaternion::default());
     }
 }
