@@ -8,6 +8,9 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Primitive-geometry diff-drive URDF with chassis, wheels and rear caster, plus
+  a consistency test against the example model’s default wheel dimensions.
+
 - `examples/diff_drive`: a minimal differential-drive robot model
   (`CuDiffDrive`, `CuDiffDriveParams`, `CuWheelSpeeds2`) with forward/inverse
   kinematics, an odometry step and tests.
