@@ -31,7 +31,8 @@ All notable changes to this project are documented here. The format follows
   instead of a fixed sample period. `CuDiffDriveSimParams.sample_period`
   is removed. A telemetry sink streams the costmap, pose, twist and
   planned path as Server-Sent Events on `127.0.0.1:18765` for Studio's
-  Live mode.
+  Live mode. The sink's bind host is configurable (`host` in RON); the
+  example sets `0.0.0.0` so Studio on another tailnet machine can watch.
 - `examples/navigate_to_goal` is now a Copper application
   (`copperconfig.ron` + `#[copper_runtime]`) with unified `.copper` logging
   and a `logreader` binary, instead of a standalone simulation loop.

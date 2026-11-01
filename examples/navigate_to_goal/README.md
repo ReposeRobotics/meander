@@ -45,6 +45,13 @@ events as the robot moves). In Repose Studio, pick the Meander robot, open
 the Drive tab, and use **Connect live**: the 3D robot, its trail, the
 planned path, and the costmap all come from this application, live.
 
+Over Tailscale, the sink binds `0.0.0.0` (see `copperconfig.ron`), so serve
+Studio on the same machine and open it by its tailnet name, e.g.
+`http://4090.taila7982f.ts.net:18080/trajectory_check.html`. Studio derives
+the telemetry URL from the hostname it was served from, so Connect live
+just works; the traffic stays inside the tailnet. Set the sink's `host`
+back to `127.0.0.1` if the robot should not be visible on any network.
+
 Outputs under `target/navigate-to-goal/`:
 
 - `navigation.png`: the costmap (black obstacles, purple inflation, white

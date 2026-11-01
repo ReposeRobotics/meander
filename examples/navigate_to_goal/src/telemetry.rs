@@ -35,7 +35,10 @@ use crate::tasks::W;
 pub struct CuTelemetryParams {
     /// Nav2 map YAML whose inflated costmap is sent to viewers.
     pub map_path: String,
-    /// TCP port of the event stream on localhost.
+    /// Interface to bind. `127.0.0.1` is this machine only; `0.0.0.0`
+    /// also serves other machines, e.g. over Tailscale.
+    pub host: String,
+    /// TCP port of the event stream.
     pub port: u16,
 }
 
@@ -43,6 +46,7 @@ impl Default for CuTelemetryParams {
     fn default() -> Self {
         Self {
             map_path: "target/waypoint-mapping/map.yaml".into(),
+            host: "127.0.0.1".into(),
             port: 18765,
         }
     }
@@ -64,6 +68,8 @@ struct Shared {
 #[derive(Reflect)]
 #[reflect(no_field_bounds, from_reflect = false)]
 pub struct CuTelemetrySink {
+    #[reflect(ignore)]
+    host: String,
     #[reflect(ignore)]
     port: u16,
     #[reflect(ignore)]
@@ -108,9 +114,9 @@ impl CuSinkTask for CuTelemetrySink {
             .map(ComponentConfig::deserialize_into::<CuTelemetryParams>)
             .transpose()?
             .unwrap_or_default();
-        if params.map_path.is_empty() || params.port == 0 {
+        if params.map_path.is_empty() || params.host.is_empty() || params.port == 0 {
             return Err(CuError::from(
-                "telemetry: map_path must not be empty and port must be > 0",
+                "telemetry: map_path and host must not be empty and port must be > 0",
             ));
         }
         let map = meander_grid::load_map::<W, H>(&params.map_path)?;
@@ -130,6 +136,7 @@ impl CuSinkTask for CuTelemetrySink {
             base64(&costs),
         );
         Ok(Self {
+            host: params.host,
             port: params.port,
             map_event,
             shared: Arc::new(Mutex::new(Shared::default())),
@@ -138,7 +145,7 @@ impl CuSinkTask for CuTelemetrySink {
     }
 
     fn start(&mut self, _ctx: &CuContext) -> CuResult<()> {
-        let listener = TcpListener::bind(("127.0.0.1", self.port))
+        let listener = TcpListener::bind((self.host.as_str(), self.port))
             .map_err(|e| CuError::new_with_cause("telemetry: cannot bind event port", e))?;
         self.running.store(true, Ordering::Release);
         let (shared, running, map_event) = (
@@ -151,8 +158,8 @@ impl CuSinkTask for CuTelemetrySink {
             .spawn(move || serve(listener, shared, map_event, running))
             .map_err(|e| CuError::new_with_cause("telemetry: cannot start server", e))?;
         println!(
-            "telemetry on http://127.0.0.1:{}/events (Studio Drive tab, Live mode)",
-            self.port
+            "telemetry on http://{}:{}/events (Studio Drive tab, Live mode)",
+            self.host, self.port
         );
         Ok(())
     }
