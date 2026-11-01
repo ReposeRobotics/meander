@@ -2,6 +2,7 @@
 members = [
   "components/libs/meander_core",
   "components/libs/meander_grid",
+  "examples/diff_drive",
 ]
 resolver = "3"
 

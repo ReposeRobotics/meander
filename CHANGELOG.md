@@ -8,6 +8,10 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- `examples/diff_drive`: a minimal differential-drive robot model
+  (`CuDiffDrive`, `CuDiffDriveParams`, `CuWheelSpeeds2`) with forward/inverse
+  kinematics, an odometry step and tests.
+
 - `meander-core`: `CuPoint2`, `CuPoint3`, `CuPose2` and `CuTwist2` payloads
   with pose composition, inversion, point transforms and exact constant-twist
   integration.
