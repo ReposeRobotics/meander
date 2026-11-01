@@ -33,7 +33,9 @@
 
 mod params;
 mod pure_pursuit;
+mod task;
 
 pub use params::CuPurePursuitParams;
 pub use pure_pursuit::CuFollowStatus;
 pub use pure_pursuit::CuPurePursuit;
+pub use task::CuPurePursuitTask;

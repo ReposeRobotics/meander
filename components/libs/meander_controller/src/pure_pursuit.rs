@@ -65,6 +65,11 @@ impl CuPurePursuit {
         self.progress_index = 0;
     }
 
+    /// Restores a progress index saved by a `Freezable` task wrapper.
+    pub(crate) fn restore_progress_index(&mut self, index: usize) {
+        self.progress_index = index;
+    }
+
     /// Computes the twist command to track `path` from `pose`.
     ///
     /// Writes the body-frame twist into `out` and returns the follow status.

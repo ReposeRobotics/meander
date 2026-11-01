@@ -7,6 +7,15 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
+mod sim;
+
+pub use sim::CuDiffDriveSimBridge;
+pub use sim::CuDiffDriveSimParams;
+pub use sim::CuDiffDriveSimRxChannels;
+pub use sim::CuDiffDriveSimRxId;
+pub use sim::CuDiffDriveSimTxChannels;
+pub use sim::CuDiffDriveSimTxId;
+
 use bincode::Decode;
 use bincode::Encode;
 use cu29::prelude::*;
