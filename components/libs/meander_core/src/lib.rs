@@ -10,14 +10,17 @@
 //! - [`CuPose3`] / [`CuQuaternion`]: spatial transforms and unit rotations.
 //! - [`CuLaserScan`] / [`CuPointCloud3`]: fixed-capacity sensor payloads with
 //!   in-place transforms into parent coordinates.
+//! - [`CuPath2`]: a fixed-capacity planar path, the planner → controller message.
 //!
 //! All geometry and sensor operations use fixed storage and allocate no heap memory.
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
+mod path;
 mod pose3;
 mod sensors;
 
+pub use path::CuPath2;
 pub use pose3::CuPose3;
 pub use pose3::CuQuaternion;
 pub use sensors::CuLaserScan;
