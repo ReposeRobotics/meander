@@ -1,5 +1,6 @@
 [workspace]
 members = [
+  "components/libs/meander_controller",
   "components/libs/meander_core",
   "components/libs/meander_grid",
   "components/libs/meander_costmap",
