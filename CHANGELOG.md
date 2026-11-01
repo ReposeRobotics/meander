@@ -8,6 +8,9 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- `meander-core`: unit quaternions, spatial poses and fixed-capacity laser scan /
+  point cloud payloads with allocation-free transforms into caller-owned buffers.
+
 - Primitive-geometry diff-drive URDF with chassis, wheels and rear caster, plus
   a consistency test against the example model’s default wheel dimensions.
 
