@@ -11,6 +11,10 @@
 //! [`CuGridGeometry3`]: the origin is the outer corner of cell `(0, 0[, 0])`
 //! and every cell is a square (cube) of side `resolution`.
 //!
+//! ROS map_server / Nav2 trinary maps use [`encode_pgm`], [`decode_pgm`] and
+//! [`CuMapMetadata`]. With `std`, `save_map` and `load_map` read/write PGM + YAML.
+//! See the crate README for a filesystem example and the supported YAML subset.
+//!
 //! Sensor rays add clamped hit/miss log-odds evidence using
 //! [`CuOccupancyUpdateParams`]. Unknown means zero evidence or probability
 //! between the inclusive free/occupied thresholds. A single default miss
@@ -42,7 +46,10 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
+extern crate alloc;
+
 mod geometry;
+mod map_io;
 mod occupancy;
 mod raycast;
 mod update;
@@ -56,3 +63,12 @@ pub use occupancy::CuOccupancy;
 pub use occupancy::CuOccupancyGrid;
 pub use update::CuOccupancyUpdateParams;
 pub use voxel::CuVoxelGrid;
+
+pub use map_io::CuMapMetadata;
+pub use map_io::CuMapMode;
+pub use map_io::decode_pgm;
+pub use map_io::encode_pgm;
+#[cfg(feature = "std")]
+pub use map_io::load_map;
+#[cfg(feature = "std")]
+pub use map_io::save_map;
