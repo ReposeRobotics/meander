@@ -18,6 +18,10 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- `examples/waypoint_mapping`: a diff-drive robot drives through waypoints in a
+  room with obstacles, maps it with a simulated lidar through
+  `CuScanMapper2`, and saves a Nav2 map plus a PNG picture with its path.
+
 - `meander-mapping`: `CuScanMappingTask` (`CuPose2` + `CuLaserScan<N>` → 2D
   log-odds map) and `CuCloudMappingTask` (`CuPose3` + `CuPointCloud3<N>` → 3D
   voxel map), built on the allocation-free `CuScanMapper2` / `CuCloudMapper3`.
