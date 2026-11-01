@@ -8,6 +8,7 @@ members = [
   "components/libs/meander_planner",
   "examples/diff_drive",
   "examples/waypoint_mapping",
+  "examples/navigate_to_goal",
 ]
 resolver = "3"
 

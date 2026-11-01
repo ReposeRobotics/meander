@@ -1,0 +1,25 @@
+[package]
+name = "meander-example-navigate-to-goal"
+description = "Example: load a saved map, plan to a goal with bidirectional Dijkstra, drive there with pure pursuit"
+version.workspace = true
+publish = false
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+cu29 = { workspace = true, features = ["std"] }
+meander-core = { path = "../../components/libs/meander_core" }
+meander-grid = { path = "../../components/libs/meander_grid" }
+meander-costmap = { path = "../../components/libs/meander_costmap" }
+meander-planner = { path = "../../components/libs/meander_planner" }
+meander-controller = { path = "../../components/libs/meander_controller" }
+meander-example-diff-drive = { path = "../diff_drive" }
+png = "0.17"
+
+[features]
+# Desktop-only example: always std. The empty feature keeps `--no-default-features` workspace runs working.
+default = ["std"]
+std = []

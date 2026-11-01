@@ -18,6 +18,11 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- `examples/navigate_to_goal`: load a saved Nav2 map, inflate it with
+  `meander-costmap`, plan to a goal with `meander-planner`'s bidirectional
+  Dijkstra, follow the `CuPath2` with `meander-controller`'s pure pursuit, and
+  save a picture of the costmap, planned path and driven path.
+
 - `meander-core`: `CuPath2<N>`, a fixed-capacity planar path payload (the
   planner → controller message) with `poses()`, `set()` and `length()`.
 
