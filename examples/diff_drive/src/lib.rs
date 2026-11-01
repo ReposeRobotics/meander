@@ -1,5 +1,9 @@
 //! Example: a minimal differential-drive robot model (two wheels on a common
 //! axle) built on `meander-core` poses and twists.
+//!
+//! `urdf/meander_diff_drive.urdf` describes a primitive-geometry robot matching
+//! the default wheel radius and separation. Its ground frame is `base_footprint`,
+//! with x forward, y left, and z up; all URDF dimensions are in SI units.
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
@@ -207,6 +211,67 @@ mod tests {
             meander_core::normalize_angle(pose.theta - Angle::default()).get::<radian>(),
             0.0
         ));
+    }
+
+    #[cfg(feature = "std")]
+    #[test]
+    fn test_urdf_matches_default_params() {
+        let document =
+            roxmltree::Document::parse(include_str!("../urdf/meander_diff_drive.urdf")).unwrap();
+        let robot = document.root_element();
+        let params = CuDiffDriveParams::default();
+        let mut origins = [[0.0_f64; 3]; 2];
+
+        for (index, side) in ["left", "right"].iter().enumerate() {
+            let joint_name = std::format!("{side}_wheel_joint");
+            let joint = robot
+                .children()
+                .find(|node| {
+                    node.has_tag_name("joint")
+                        && node.attribute("name") == Some(joint_name.as_str())
+                })
+                .unwrap();
+            assert_eq!(joint.attribute("type"), Some("continuous"));
+            let origin = joint
+                .children()
+                .find(|node| node.has_tag_name("origin"))
+                .unwrap();
+            let coordinates: std::vec::Vec<f64> = origin
+                .attribute("xyz")
+                .unwrap()
+                .split_whitespace()
+                .map(|value| value.parse().unwrap())
+                .collect();
+            origins[index].copy_from_slice(&coordinates);
+
+            let link_name = std::format!("{side}_wheel_link");
+            let link = robot
+                .children()
+                .find(|node| {
+                    node.has_tag_name("link") && node.attribute("name") == Some(link_name.as_str())
+                })
+                .unwrap();
+            for element in ["visual", "collision"] {
+                let geometry = link
+                    .children()
+                    .find(|node| node.has_tag_name(element))
+                    .unwrap();
+                let cylinder = geometry
+                    .descendants()
+                    .find(|node| node.has_tag_name("cylinder"))
+                    .unwrap();
+                let radius: f64 = cylinder.attribute("radius").unwrap().parse().unwrap();
+                assert!(close(radius, params.wheel_radius.get::<meter>()));
+            }
+        }
+
+        let distance = origins[0]
+            .iter()
+            .zip(origins[1])
+            .map(|(left, right)| (left - right).powi(2))
+            .sum::<f64>()
+            .sqrt();
+        assert!(close(distance, params.wheel_separation.get::<meter>()));
     }
 
     #[cfg(feature = "std")]
