@@ -29,6 +29,13 @@ All notable changes to this project are documented here. The format follows
   interpolation, curvature-preserving velocity clamping, rotate-in-place at
   sharp angles, and goal heading alignment.
 
+- `meander-planner`: allocation-free `CuBidirectionalDijkstra<W, H>` over
+  Nav2-style cost grids (`&[[u8; W]; H]` + `CuGridGeometry2`), with 8-connected
+  steps, no corner cutting past blocked cells, correct bidirectional
+  termination, and goal tolerance for blocked goals. `plan` writes cell-center
+  waypoints with along-path headings into a caller buffer and reports a
+  `CuPlanStatus` (`Found`, `NoPath`, `StartBlocked`, `GoalBlocked`,
+  `OutsideMap`, `PathTooLong`) with waypoint count and total cost.
 - `examples/waypoint_mapping`: a diff-drive robot drives through waypoints in a
   room with obstacles, maps it with a simulated lidar through
   `CuScanMapper2`, and saves a Nav2 map plus a PNG picture with its path.

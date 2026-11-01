@@ -5,6 +5,7 @@ members = [
   "components/libs/meander_grid",
   "components/libs/meander_costmap",
   "components/libs/meander_mapping",
+  "components/libs/meander_planner",
   "examples/diff_drive",
   "examples/waypoint_mapping",
 ]
