@@ -4,7 +4,8 @@ Meander grows slowly: each release adds one layer and keeps it solid.
 
 ## 0.1 — Core and maps
 
-- `meander-core`: units-typed `CuPoint2`, `CuPoint3`, `CuPose2`, `CuTwist2`;
+- `meander-core`: units-typed `CuPoint2`, `CuPoint3`, `CuPose2`, `CuPose3`,
+  `CuQuaternion`, `CuTwist2`, and fixed-capacity scan / point cloud payloads;
   pose composition/inversion and exact constant-twist integration (odometry).
 - `meander-grid`: fixed-size 2D occupancy grid and 3D voxel grid with
   world↔cell geometry, ray casting for sensor insertion, and voxel → 2D

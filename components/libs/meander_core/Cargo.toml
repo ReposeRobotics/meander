@@ -21,6 +21,7 @@ bincode = { workspace = true }
 cu29 = { workspace = true }
 libm = { workspace = true }
 serde = { workspace = true }
+serde-big-array = { version = "0.5", default-features = false }
 
 [dev-dependencies]
 ron = "0.12"
