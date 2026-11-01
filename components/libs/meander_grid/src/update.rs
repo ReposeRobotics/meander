@@ -114,6 +114,11 @@ impl UpdateModel {
         }
     }
 
+    /// Whether `value` is a log-odds this model could have produced.
+    pub(crate) fn admits(&self, value: f32) -> bool {
+        value.is_finite() && value >= self.min && value <= self.max
+    }
+
     pub(crate) fn classify(&self, value: f32) -> CuOccupancy {
         if value <= self.free {
             CuOccupancy::Free

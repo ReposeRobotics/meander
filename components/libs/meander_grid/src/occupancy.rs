@@ -77,6 +77,24 @@ impl<const W: usize, const H: usize> CuOccupancyGrid<W, H> {
         &self.log_odds
     }
 
+    /// Replaces every cell's log-odds, e.g. to restore a frozen map on replay.
+    /// Errors, leaving the grid unchanged, if any value is nonfinite or
+    /// outside this grid's clamp range.
+    pub fn load_log_odds_rows(&mut self, rows: &[[f32; W]; H]) -> CuResult<()> {
+        if !rows.iter().flatten().all(|&v| self.model.admits(v)) {
+            return Err(CuError::from(
+                "meander-grid: log-odds must be finite and within the clamp range",
+            ));
+        }
+        self.log_odds = *rows;
+        for (cells, values) in self.cells.iter_mut().zip(rows) {
+            for (cell, &value) in cells.iter_mut().zip(values) {
+                *cell = self.model.classify(value);
+            }
+        }
+        Ok(())
+    }
+
     /// The grid's placement in the world.
     pub fn geometry(&self) -> &CuGridGeometry2 {
         &self.geometry
@@ -237,6 +255,27 @@ mod tests {
         assert_eq!(g.get(CuCell2::new(10, 0)), None);
         g.fill(CuOccupancy::Free);
         assert!(g.cells().iter().flatten().all(|c| *c == CuOccupancy::Free));
+    }
+
+    #[test]
+    fn test_load_log_odds_rows_restores_state() {
+        let mut source = grid();
+        for _ in 0..4 {
+            source.insert_ray(p(-0.75, 0.25), p(2.25, 0.25)).unwrap();
+        }
+        let mut restored = grid();
+        restored.load_log_odds_rows(source.log_odds_rows()).unwrap();
+        assert_eq!(restored, source);
+
+        let mut bad = *source.log_odds_rows();
+        bad[0][0] = f32::NAN;
+        assert!(restored.load_log_odds_rows(&bad).is_err());
+        bad[0][0] = 100.0;
+        assert!(restored.load_log_odds_rows(&bad).is_err());
+        assert_eq!(
+            restored, source,
+            "a rejected load leaves the grid unchanged"
+        );
     }
 
     #[test]

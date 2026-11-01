@@ -60,6 +60,31 @@ impl<const W: usize, const H: usize, const D: usize> CuVoxelGrid<W, H, D> {
         &self.log_odds
     }
 
+    /// Replaces every voxel's log-odds, e.g. to restore a frozen map on replay.
+    /// Errors, leaving the grid unchanged, if any value is nonfinite or
+    /// outside this grid's clamp range.
+    pub fn load_log_odds_rows(&mut self, rows: &[[[f32; W]; H]; D]) -> CuResult<()> {
+        if !rows
+            .iter()
+            .flatten()
+            .flatten()
+            .all(|&v| self.model.admits(v))
+        {
+            return Err(CuError::from(
+                "meander-grid: log-odds must be finite and within the clamp range",
+            ));
+        }
+        self.log_odds = *rows;
+        for (layer, values) in self.cells.iter_mut().zip(rows) {
+            for (cells, values) in layer.iter_mut().zip(values) {
+                for (cell, &value) in cells.iter_mut().zip(values) {
+                    *cell = self.model.classify(value);
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// The grid's placement in the world.
     pub fn geometry(&self) -> &CuGridGeometry3 {
         &self.geometry
@@ -241,6 +266,24 @@ mod tests {
     fn geometry() -> CuGridGeometry3 {
         // 0.1 m voxels from the origin: 0.8 × 0.8 × 0.4 m.
         CuGridGeometry3::new(m(0.1), p(0.0, 0.0, 0.0)).unwrap()
+    }
+
+    #[test]
+    fn test_load_log_odds_rows_restores_state() {
+        let params = CuOccupancyUpdateParams::default();
+        let mut source = CuVoxelGrid::<8, 8, 4>::from_params(geometry(), params.clone()).unwrap();
+        for _ in 0..4 {
+            source
+                .insert_ray(p(0.05, 0.05, 0.05), p(0.55, 0.05, 0.05))
+                .unwrap();
+        }
+        let mut restored = CuVoxelGrid::<8, 8, 4>::from_params(geometry(), params).unwrap();
+        restored.load_log_odds_rows(source.log_odds_rows()).unwrap();
+        assert_eq!(restored, source);
+        let mut bad = *source.log_odds_rows();
+        bad[0][0][0] = f32::INFINITY;
+        assert!(restored.load_log_odds_rows(&bad).is_err());
+        assert_eq!(restored, source);
     }
 
     #[test]

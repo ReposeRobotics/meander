@@ -26,6 +26,7 @@ test:
 api-check:
     cargo public-api -p meander-core
     cargo public-api -p meander-grid
+    cargo public-api -p meander-mapping
 
 # Check every library crate for SemVer breaks against the latest release tag (needs cargo-semver-checks).
 # Part of pr-check; skipped until the first `v*` tag exists. Breaks are allowed once CHANGELOG.md has a
