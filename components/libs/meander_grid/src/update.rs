@@ -40,7 +40,8 @@ impl Default for CuOccupancyUpdateParams {
 impl CuOccupancyUpdateParams {
     /// Checks finite probabilities in (0, 1), directional evidence, and
     /// clamp_min <= free_threshold < 0.5 < occupied_threshold <= clamp_max.
-    /// Also rejects values whose f32 log-odds lose these relationships.
+    /// Also rejects values whose f32 log-odds lose these relationships, and
+    /// evidence too weak to move a cell away from either clamp in f32.
     pub fn validate(&self) -> CuResult<()> {
         for p in [
             self.p_hit,
@@ -68,13 +69,26 @@ impl CuOccupancyUpdateParams {
             && m.occupied > 0.0
             && m.occupied <= m.max
             && m.miss < 0.0
-            && m.hit > 0.0)
+            && m.hit > 0.0
+            // Each update must still move a saturated cell in f32, or it could never recover.
+            && m.min + m.hit > m.min
+            && m.max + m.miss < m.max)
         {
             return Err(CuError::from(
                 "meander-grid: invalid occupancy evidence, clamps or thresholds",
             ));
         }
         Ok(())
+    }
+}
+
+/// Logistic function, branched on sign so neither side overflows `exp`.
+pub(crate) fn sigmoid(l: f64) -> f64 {
+    if l >= 0.0 {
+        1.0 / (1.0 + libm::exp(-l))
+    } else {
+        let e = libm::exp(l);
+        e / (1.0 + e)
     }
 }
 
@@ -140,5 +154,27 @@ mod tests {
         assert_eq!(model.classify(model.free + 1e-5), CuOccupancy::Unknown);
         assert_eq!(model.classify(model.occupied - 1e-5), CuOccupancy::Unknown);
         assert_eq!(model.classify(0.0), CuOccupancy::Unknown);
+    }
+
+    #[test]
+    fn test_rejects_evidence_too_weak_to_leave_a_clamp() {
+        let weak_hit = CuOccupancyUpdateParams {
+            p_hit: 0.500_000_01,
+            ..CuOccupancyUpdateParams::default()
+        };
+        assert!(weak_hit.validate().is_err());
+        let weak_miss = CuOccupancyUpdateParams {
+            p_miss: 0.499_999_99,
+            ..CuOccupancyUpdateParams::default()
+        };
+        assert!(weak_miss.validate().is_err());
+    }
+
+    #[test]
+    fn test_sigmoid_stays_positive_for_extreme_log_odds() {
+        assert!(sigmoid(-713.8) > 0.0);
+        assert!(sigmoid(713.8) <= 1.0);
+        assert!((sigmoid(0.0) - 0.5).abs() < 1e-12);
+        assert!((sigmoid(-2.0) + sigmoid(2.0) - 1.0).abs() < 1e-12);
     }
 }

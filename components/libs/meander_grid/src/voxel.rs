@@ -52,7 +52,7 @@ impl<const W: usize, const H: usize, const D: usize> CuVoxelGrid<W, H, D> {
 
     /// Dimensionless probability, or None outside; unobserved cells have probability 0.5.
     pub fn probability(&self, cell: CuCell3) -> Option<f64> {
-        self.log_odds(cell).map(|l| 1.0 / (1.0 + libm::exp(-l)))
+        self.log_odds(cell).map(crate::update::sigmoid)
     }
 
     /// Borrowed raw dimensionless f32 log-odds, in the same order as cells().
