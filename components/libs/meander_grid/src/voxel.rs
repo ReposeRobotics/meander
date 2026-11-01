@@ -1,6 +1,9 @@
+//! Fixed-capacity classified and probabilistic occupancy storage.
+
 use crate::geometry::{CuCell2, CuCell3, CuGridGeometry3};
 use crate::occupancy::{CuOccupancy, CuOccupancyGrid};
 use crate::raycast::{cell_of, traverse};
+use crate::update::{CuOccupancyUpdateParams, UpdateModel};
 use cu29::prelude::*;
 use cu29::units::si::f64::Length;
 use cu29::units::si::length::meter;
@@ -8,20 +11,53 @@ use meander_core::CuPoint3;
 
 /// A fixed-size 3D voxel grid of `W × H × D` voxels (`x`, `y`, `z`).
 ///
-/// Every voxel starts [`CuOccupancy::Unknown`].
+/// Every voxel starts at zero log-odds (probability 0.5), classified Unknown.
+/// Log-odds use f32 storage; thresholds are compared in the same precision.
 #[derive(Debug, Clone, PartialEq)]
 pub struct CuVoxelGrid<const W: usize, const H: usize, const D: usize> {
     geometry: CuGridGeometry3,
+    params: CuOccupancyUpdateParams,
+    model: UpdateModel,
+    log_odds: [[[f32; W]; H]; D],
     cells: [[[CuOccupancy; W]; H]; D],
 }
 
 impl<const W: usize, const H: usize, const D: usize> CuVoxelGrid<W, H, D> {
-    /// Creates an all-unknown grid placed by `geometry`.
-    pub fn new(geometry: CuGridGeometry3) -> Self {
-        Self {
+    /// Creates an all-unknown grid, validating the update parameters.
+    pub fn from_params(
+        geometry: CuGridGeometry3,
+        params: CuOccupancyUpdateParams,
+    ) -> CuResult<Self> {
+        params.validate()?;
+        let model = UpdateModel::new(&params);
+        Ok(Self {
             geometry,
+            params,
+            model,
+            log_odds: [[[0.0; W]; H]; D],
             cells: [[[CuOccupancy::Unknown; W]; H]; D],
-        }
+        })
+    }
+
+    /// Validated update parameters.
+    pub fn params(&self) -> &CuOccupancyUpdateParams {
+        &self.params
+    }
+
+    /// Dimensionless log-odds, or None outside. Zero represents the 0.5 prior.
+    pub fn log_odds(&self, cell: CuCell3) -> Option<f64> {
+        self.contains(cell)
+            .then(|| self.log_odds[cell.z][cell.y][cell.x] as f64)
+    }
+
+    /// Dimensionless probability, or None outside; unobserved cells have probability 0.5.
+    pub fn probability(&self, cell: CuCell3) -> Option<f64> {
+        self.log_odds(cell).map(|l| 1.0 / (1.0 + libm::exp(-l)))
+    }
+
+    /// Borrowed raw dimensionless f32 log-odds, in the same order as cells().
+    pub fn log_odds_rows(&self) -> &[[[f32; W]; H]; D] {
+        &self.log_odds
     }
 
     /// The grid's placement in the world.
@@ -58,6 +94,7 @@ impl<const W: usize, const H: usize, const D: usize> CuVoxelGrid<W, H, D> {
         self.cell_of(point).and_then(|cell| self.get(cell))
     }
 
+    /// Sets log-odds to the clamp extreme (Free/Occupied) or zero (Unknown).
     /// Sets the state of `cell`; errors outside the grid.
     pub fn set(&mut self, cell: CuCell3, state: CuOccupancy) -> CuResult<()> {
         let slot = self
@@ -67,11 +104,16 @@ impl<const W: usize, const H: usize, const D: usize> CuVoxelGrid<W, H, D> {
             .and_then(|row| row.get_mut(cell.x))
             .ok_or_else(|| CuError::from("meander-grid: voxel outside the voxel grid"))?;
         *slot = state;
+        self.log_odds[cell.z][cell.y][cell.x] = self.model.value(state);
         Ok(())
     }
 
+    /// Uses clamp extremes for Free/Occupied and zero for Unknown.
     /// Sets every voxel to `state`.
     pub fn fill(&mut self, state: CuOccupancy) {
+        for row in self.log_odds.iter_mut().flatten() {
+            row.fill(self.model.value(state));
+        }
         for row in self.cells.iter_mut().flatten() {
             row.fill(state);
         }
@@ -83,26 +125,30 @@ impl<const W: usize, const H: usize, const D: usize> CuVoxelGrid<W, H, D> {
     }
 
     /// Inserts a sensor return: voxels from `origin` up to (not including)
-    /// the voxel of `hit` become free; the hit voxel becomes occupied if it
+    /// the voxel of `hit` receive miss evidence; the hit voxel receives hit evidence if it
     /// is inside the grid. Errors if `origin` is outside the grid.
     pub fn insert_ray(&mut self, origin: CuPoint3, hit: CuPoint3) -> CuResult<()> {
         let hit_cell = self.cell_of(hit);
         self.trace_free(origin, hit, hit_cell)?;
         if let Some(cell) = hit_cell {
-            self.set(cell, CuOccupancy::Occupied)?;
+            let state = self
+                .model
+                .add(&mut self.log_odds[cell.z][cell.y][cell.x], self.model.hit);
+            self.cells[cell.z][cell.y][cell.x] = state;
         }
         Ok(())
     }
 
     /// Clears a ray without a return (max-range reading): every voxel from
-    /// `origin` to `end` becomes free. Errors if `origin` is outside the grid.
+    /// `origin` to `end` receives miss evidence. Errors if `origin` is outside the grid.
     pub fn clear_ray(&mut self, origin: CuPoint3, end: CuPoint3) -> CuResult<()> {
         self.trace_free(origin, end, None)
     }
 
     /// Flattens the voxels whose centers lie in `[z_min, z_max]` into `out`:
     /// a column is occupied if any voxel in the band is occupied, otherwise
-    /// free if any is free, otherwise unknown.
+    /// free if any is free, otherwise unknown. Each voxel uses this grid's
+    /// thresholds; the target receives classifications at its clamp extremes.
     ///
     /// `out` must share this grid's resolution and `x`/`y` origin; a band
     /// that contains no voxel center makes every column unknown.
@@ -157,13 +203,15 @@ impl<const W: usize, const H: usize, const D: usize> CuVoxelGrid<W, H, D> {
         keep: Option<CuCell3>,
     ) -> CuResult<()> {
         let cells = &mut self.cells;
+        let log_odds = &mut self.log_odds;
+        let model = &self.model;
         let inside = traverse(
             self.geometry.grid_coords(origin),
             self.geometry.grid_coords(end),
             [W, H, D],
             |[x, y, z]| {
                 if keep != Some(CuCell3::new(x, y, z)) {
-                    cells[z][y][x] = CuOccupancy::Free;
+                    cells[z][y][x] = model.add(&mut log_odds[z][y][x], model.miss);
                 }
             },
         );
@@ -197,7 +245,8 @@ mod tests {
 
     #[test]
     fn test_world_voxel_round_trip() {
-        let g = CuVoxelGrid::<8, 8, 4>::new(geometry());
+        let g = CuVoxelGrid::<8, 8, 4>::from_params(geometry(), CuOccupancyUpdateParams::default())
+            .unwrap();
         assert_eq!(g.cell_of(p(0.55, 0.15, 0.35)), Some(CuCell3::new(5, 1, 3)));
         assert_eq!(g.cell_of(p(0.55, 0.15, 0.45)), None);
         let c = g.cell_center(CuCell3::new(5, 1, 3)).unwrap();
@@ -206,9 +255,13 @@ mod tests {
 
     #[test]
     fn test_insert_ray_3d() {
-        let mut g = CuVoxelGrid::<8, 8, 4>::new(geometry());
-        g.insert_ray(p(0.05, 0.05, 0.05), p(0.75, 0.05, 0.35))
-            .unwrap();
+        let mut g =
+            CuVoxelGrid::<8, 8, 4>::from_params(geometry(), CuOccupancyUpdateParams::default())
+                .unwrap();
+        for _ in 0..4 {
+            g.insert_ray(p(0.05, 0.05, 0.05), p(0.75, 0.05, 0.35))
+                .unwrap();
+        }
         assert_eq!(g.get(CuCell3::new(0, 0, 0)), Some(CuOccupancy::Free));
         assert_eq!(g.get(CuCell3::new(7, 0, 3)), Some(CuOccupancy::Occupied));
         let occupied = g.cells().iter().flatten().flatten();
@@ -218,12 +271,18 @@ mod tests {
 
     #[test]
     fn test_project_band() {
-        let mut g = CuVoxelGrid::<8, 8, 4>::new(geometry());
+        let mut g =
+            CuVoxelGrid::<8, 8, 4>::from_params(geometry(), CuOccupancyUpdateParams::default())
+                .unwrap();
         g.set(CuCell3::new(1, 1, 0), CuOccupancy::Occupied).unwrap(); // floor clutter
         g.set(CuCell3::new(2, 2, 2), CuOccupancy::Occupied).unwrap(); // table edge
         g.set(CuCell3::new(3, 3, 1), CuOccupancy::Free).unwrap();
         g.set(CuCell3::new(3, 3, 2), CuOccupancy::Free).unwrap();
-        let mut out = CuOccupancyGrid::<8, 8>::new(geometry().xy());
+        let mut out = CuOccupancyGrid::<8, 8>::from_params(
+            geometry().xy(),
+            CuOccupancyUpdateParams::default(),
+        )
+        .unwrap();
         // Band 0.1–0.3 m: voxel centers 0.15 and 0.25 (z = 1, 2).
         g.project_into(m(0.1), m(0.3), &mut out).unwrap();
         assert_eq!(out.get(CuCell2::new(1, 1)), Some(CuOccupancy::Unknown));
@@ -241,11 +300,18 @@ mod tests {
 
     #[test]
     fn test_project_rejects_mismatch() {
-        let g = CuVoxelGrid::<8, 8, 4>::new(geometry());
+        let g = CuVoxelGrid::<8, 8, 4>::from_params(geometry(), CuOccupancyUpdateParams::default())
+            .unwrap();
         let shifted = CuGridGeometry2::new(m(0.1), CuPoint2::new(m(0.05), m(0.0))).unwrap();
-        let mut out = CuOccupancyGrid::<8, 8>::new(shifted);
+        let mut out =
+            CuOccupancyGrid::<8, 8>::from_params(shifted, CuOccupancyUpdateParams::default())
+                .unwrap();
         assert!(g.project_into(m(0.0), m(0.4), &mut out).is_err());
-        let mut out = CuOccupancyGrid::<8, 8>::new(geometry().xy());
+        let mut out = CuOccupancyGrid::<8, 8>::from_params(
+            geometry().xy(),
+            CuOccupancyUpdateParams::default(),
+        )
+        .unwrap();
         assert!(g.project_into(m(0.3), m(0.1), &mut out).is_err());
     }
 }

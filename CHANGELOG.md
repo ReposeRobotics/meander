@@ -6,6 +6,16 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Breaking
+
+- Occupancy and voxel grids accumulate clamped log-odds evidence instead of
+  overwriting cells on sensor rays. Unknown includes probabilities between
+  classification thresholds. Construct grids with
+  `from_params(geometry, CuOccupancyUpdateParams::default())?` instead of
+  `new(geometry)`. Classified `get`, `set`, `fill`, and `cells` remain
+  available; probability and raw log-odds accessors expose accumulated evidence.
+  See `docs/log-odds-migration.md` for migration details.
+
 ### Added
 
 - Primitive-geometry diff-drive URDF with chassis, wheels and rear caster, plus

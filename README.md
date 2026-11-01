@@ -18,13 +18,13 @@ const generics, so a map's memory is known at compile time.
 use cu29::units::si::f64::Length;
 use cu29::units::si::length::meter;
 use meander_core::CuPoint2;
-use meander_grid::{CuGridGeometry2, CuOccupancy, CuOccupancyGrid};
+use meander_grid::{CuGridGeometry2, CuOccupancy, CuOccupancyGrid, CuOccupancyUpdateParams};
 
 let geometry = CuGridGeometry2::new(
     Length::new::<meter>(0.05),
     CuPoint2::new(Length::new::<meter>(0.0), Length::new::<meter>(0.0)),
 )?;
-let mut grid = CuOccupancyGrid::<64, 64>::new(geometry);
+let mut grid = CuOccupancyGrid::<64, 64>::from_params(geometry, CuOccupancyUpdateParams::default())?;
 let sensor = CuPoint2::new(Length::new::<meter>(0.5), Length::new::<meter>(0.5));
 let hit = CuPoint2::new(Length::new::<meter>(2.0), Length::new::<meter>(1.0));
 grid.insert_ray(sensor, hit)?;
