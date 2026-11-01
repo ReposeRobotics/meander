@@ -1,0 +1,30 @@
+[package]
+name = "meander-core"
+description = "Units-typed 2D/3D points, poses and twists for copper-rs navigation"
+version.workspace = true
+publish.workspace = true
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+keywords.workspace = true
+categories.workspace = true
+repository.workspace = true
+
+[package.metadata.copper]
+kind = "lib"
+domains = ["algorithm/navigation"]
+environments = ["host", "embedded"]
+
+[dependencies]
+bincode = { workspace = true }
+cu29 = { workspace = true }
+libm = { workspace = true }
+serde = { workspace = true }
+
+[dev-dependencies]
+ron = "0.12"
+
+[features]
+default = ["std"]
+std = ["cu29/std", "bincode/std", "serde/std"]

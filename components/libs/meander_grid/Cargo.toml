@@ -1,0 +1,28 @@
+[package]
+name = "meander-grid"
+description = "Fixed-size 2D occupancy grids and 3D voxel grids for copper-rs navigation"
+version.workspace = true
+publish.workspace = true
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+keywords.workspace = true
+categories.workspace = true
+repository.workspace = true
+
+[package.metadata.copper]
+kind = "lib"
+domains = ["algorithm/navigation"]
+environments = ["host", "embedded"]
+
+[dependencies]
+bincode = { workspace = true }
+cu29 = { workspace = true }
+libm = { workspace = true }
+serde = { workspace = true }
+meander-core = { version = "0.1.0", path = "../meander_core", default-features = false }
+
+[features]
+default = ["std"]
+std = ["cu29/std", "meander-core/std", "bincode/std", "serde/std"]
