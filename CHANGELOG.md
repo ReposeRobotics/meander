@@ -24,6 +24,11 @@ All notable changes to this project are documented here. The format follows
 - `meander-costmap`: fixed-size Nav2 costs with allocation-free exact Euclidean
   inflation, typed robot/inflation radii, and configurable unknown handling.
 
+- `meander-controller`: `CuPurePursuit` regulated pure pursuit path following for
+  differential-drive robots with `CuPurePursuitParams`, lookahead segment
+  interpolation, curvature-preserving velocity clamping, rotate-in-place at
+  sharp angles, and goal heading alignment.
+
 - `examples/waypoint_mapping`: a diff-drive robot drives through waypoints in a
   room with obstacles, maps it with a simulated lidar through
   `CuScanMapper2`, and saves a Nav2 map plus a PNG picture with its path.
