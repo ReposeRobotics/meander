@@ -32,6 +32,26 @@ cargo run --release -p meander-example-waypoint-mapping   # build and save the m
 cargo run --release -p meander-example-navigate-to-goal   # goal (2.8, 2.8) from copperconfig.ron
 ```
 
+The loop is paced with the runtime's `LoopRateLimiter` at the
+`copperconfig.ron` rate (50 Hz of wall time), and the sim bridge integrates
+each twist over the measured time since the previous command's `tov` — so
+the robot drives in real time, the same timing a hardware bridge would see.
+
+## Watch it drive in Studio
+
+The telemetry sink serves Server-Sent Events at
+`http://127.0.0.1:18765/events` (one costmap event, then pose/twist/path
+events as the robot moves). In Repose Studio, pick the Meander robot, open
+the Drive tab, and use **Connect live**: the 3D robot, its trail, the
+planned path, and the costmap all come from this application, live.
+
+Over Tailscale, the sink binds `0.0.0.0` (see `copperconfig.ron`), so serve
+Studio on the same machine and open it by its tailnet name, e.g.
+`http://4090.taila7982f.ts.net:18080/trajectory_check.html`. Studio derives
+the telemetry URL from the hostname it was served from, so Connect live
+just works; the traffic stays inside the tailnet. Set the sink's `host`
+back to `127.0.0.1` if the robot should not be visible on any network.
+
 Outputs under `target/navigate-to-goal/`:
 
 - `navigation.png`: the costmap (black obstacles, purple inflation, white
