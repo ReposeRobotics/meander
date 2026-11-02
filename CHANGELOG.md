@@ -18,6 +18,13 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- `examples/navigate_to_goal`: the telemetry sink now serves the Studio
+  Copper viewer contract — `GET /studio/describe` (self-description:
+  `costmap`/`pose`/`path` semantic-kind streams, `map`/`base_link`
+  frames, Copper graph, no controls) and the same document as the first
+  `describe` event on `/events`, before the existing `map`/`state`
+  events. The legacy Drive-tab Live mode instructions are replaced by
+  the generic viewer's Connect flow.
 - `meander-planner`: `CuPlannerTask<W, H, N>` Copper task (with
   `CuPlannerTaskParams`) that loads and inflates a Nav2 map, plans once to
   the configured goal, and republishes the cached `CuPath2<N>`.

@@ -39,18 +39,30 @@ the robot drives in real time, the same timing a hardware bridge would see.
 
 ## Watch it drive in Studio
 
-The telemetry sink serves Server-Sent Events at
-`http://127.0.0.1:18765/events` (one costmap event, then pose/twist/path
-events as the robot moves). In Repose Studio, pick the Meander robot, open
-the Drive tab, and use **Connect live**: the 3D robot, its trail, the
-planned path, and the costmap all come from this application, live.
+Studio is now a generic Copper viewer: this app describes itself and
+Studio renders that description — no per-app Studio code. The telemetry
+sink serves, on one port (18765 by default):
 
-Over Tailscale, the sink binds `0.0.0.0` (see `copperconfig.ron`), so serve
-Studio on the same machine and open it by its tailnet name, e.g.
-`http://4090.taila7982f.ts.net:18080/trajectory_check.html`. Studio derives
-the telemetry URL from the hostname it was served from, so Connect live
-just works; the traffic stays inside the tailnet. Set the sink's `host`
-back to `127.0.0.1` if the robot should not be visible on any network.
+- `GET /studio/describe` — the self-description (`studio: 1`): frames
+  (`map`, `base_link`), the Copper graph from `copperconfig.ron`, and
+  three streams — `costmap` (`occupancy_grid`), `pose` (`pose`), and
+  `path` (`path`). No controls are declared: the app takes no uplink.
+- `GET /events` — Server-Sent Events: the same description as the first
+  `describe` event, one `map` event (inflated costmap), then `state`
+  events (pose, twist, planned path) as the robot moves.
+
+Run the demo, then the Studio viewer (`studio/app`: `npm ci && npm run dev`),
+leave the Copper endpoint at `http://<host>:18765`, and click **Connect**.
+Displays for the costmap, robot pose, and planned path are created from
+the description; use **+ Display**, the Graph panel, and the raw
+inspector to explore the rest.
+
+Over Tailscale, the sink binds `0.0.0.0` (see `copperconfig.ron`), so
+serve Studio on the same machine and open it by its tailnet name. The
+viewer derives the endpoint host from the hostname it was served from,
+so Connect just works; the traffic stays inside the tailnet. Set the
+sink's `host` back to `127.0.0.1` if the robot should not be visible on
+any network.
 
 Outputs under `target/navigate-to-goal/`:
 
