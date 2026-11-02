@@ -8,8 +8,15 @@ on:
 permissions:
   contents: read
 
+# A newer push to the same branch supersedes the run before it.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   pr-check:
+    # Draft PRs are work in progress; the gate runs when marked ready.
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -29,7 +36,7 @@ jobs:
           cargo test --workspace --doc --features std
 
   semver-check:
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- CI/review cost controls: CodeRabbit no longer auto-reviews (request one
+  with `@coderabbitai review` on a PR; see `.coderabbit.yaml`), and the
+  Actions gate skips draft PRs and cancels superseded runs on the same
+  branch.
+
 ### Breaking
 
 - Occupancy and voxel grids accumulate clamped log-odds evidence instead of
