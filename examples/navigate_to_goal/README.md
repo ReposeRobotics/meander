@@ -51,11 +51,25 @@ sink serves, on one port (18765 by default):
   `describe` event, one `map` event (inflated costmap), then `state`
   events (pose, twist, planned path) as the robot moves.
 
-Run the demo, then the Studio viewer (`studio/app`: `npm ci && npm run dev`),
-leave the Copper endpoint at `http://<host>:18765`, and click **Connect**.
-Displays for the costmap, robot pose, and planned path are created from
-the description; use **+ Display**, the Graph panel, and the raw
-inspector to explore the rest.
+Studio is a separate repository — it is not part of this checkout.
+Clone [ReposeRobotics/studio](https://github.com/ReposeRobotics/studio)
+alongside Meander, then install and start the viewer **before** starting
+this demo (the robot reaches its goal in ~21 s and the demo stops after
+60 s, so a first-time `npm ci` started afterwards finishes too late to
+watch it drive):
+
+```sh
+# in the studio checkout, once
+cd studio/app && npm ci
+npm run dev
+# then, in this repository
+cargo run --release -p meander-example-navigate-to-goal
+```
+
+Leave the viewer's Copper endpoint at `http://<host>:18765` and click
+**Connect**. Displays for the costmap, robot pose, and planned path are
+created from the description; use **+ Display**, the Graph panel, and
+the raw inspector to explore the rest.
 
 Over Tailscale, the sink binds `0.0.0.0` (see `copperconfig.ron`), so
 serve Studio on the same machine and open it by its tailnet name. The

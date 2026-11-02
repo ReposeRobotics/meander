@@ -114,7 +114,7 @@ impl CuTelemetrySink {
 /// No controls are declared: the app accepts no uplink commands, and
 /// Studio's control forms only render what is declared here.
 fn describe_json() -> String {
-    r##"{"studio":1,"app":{"id":"meander-nav","name":"Meander navigate-to-goal"},"frames":[{"id":"map"},{"id":"base_link","parent":"map"}],"assets":[],"graph":{"tasks":[{"id":"planner","type":"meander_planner::CuPlannerTask<200, 200, 2048>"},{"id":"controller","type":"meander_controller::CuPurePursuitTask<2048>"},{"id":"recorder","type":"tasks::CuNavigationRecorder"},{"id":"telemetry","type":"telemetry::CuTelemetrySink"}],"bridges":[{"id":"sim","type":"meander_example_diff_drive::CuDiffDriveSimBridge"},{"id":"telemetry-sse","type":"studio::SseBridge"}],"connections":[{"src":"sim/pose","dst":"planner","msg":"meander_core::CuPose2"},{"src":"sim/pose","dst":"controller","msg":"meander_core::CuPose2"},{"src":"planner","dst":"controller","msg":"meander_core::CuPath2<2048>"},{"src":"controller","dst":"sim/twist","msg":"meander_core::CuTwist2"},{"src":"sim/pose","dst":"telemetry","msg":"meander_core::CuPose2"},{"src":"planner","dst":"telemetry","msg":"meander_core::CuPath2<2048>"},{"src":"controller","dst":"telemetry","msg":"meander_core::CuTwist2"}]},"streams":[{"id":"costmap","msg":"meander_costmap::CuCostmap2","kind":"occupancy_grid","direction":"out","frame":"map","fields":[{"name":"width","type":"u32"},{"name":"height","type":"u32"},{"name":"resolution","type":"f64","unit":"m"},{"name":"origin","type":"vec2","unit":"m"},{"name":"costs","type":"u8[]"}],"hints":{"in3d":true}},{"id":"pose","msg":"meander_core::CuPose2","kind":"pose","direction":"out","frame":"map","fields":[{"name":"x","type":"f64","unit":"m"},{"name":"y","type":"f64","unit":"m"},{"name":"theta","type":"f64","unit":"rad"}],"hints":{"color":"#34d399","in3d":true}},{"id":"path","msg":"meander_core::CuPath2","kind":"path","direction":"out","frame":"map","fields":[{"name":"poses","type":"pose2[]","unit":"m"}],"hints":{"color":"#a78bfa","in3d":true}}],"controls":[]}"##
+    r##"{"studio":1,"app":{"id":"meander-nav","name":"Meander navigate-to-goal"},"frames":[{"id":"map"},{"id":"base_link","parent":"map"}],"assets":[],"graph":{"tasks":[{"id":"planner","type":"meander_planner::CuPlannerTask<200, 200, 2048>"},{"id":"controller","type":"meander_controller::CuPurePursuitTask<2048>"},{"id":"recorder","type":"tasks::CuNavigationRecorder"},{"id":"telemetry","type":"telemetry::CuTelemetrySink"}],"bridges":[{"id":"sim","type":"meander_example_diff_drive::CuDiffDriveSimBridge"},{"id":"telemetry-sse","type":"studio::SseBridge"}],"connections":[{"src":"sim/pose","dst":"planner","msg":"meander_core::CuPose2"},{"src":"sim/pose","dst":"controller","msg":"meander_core::CuPose2"},{"src":"planner","dst":"controller","msg":"meander_core::CuPath2<2048>"},{"src":"controller","dst":"sim/twist","msg":"meander_core::CuTwist2"},{"src":"sim/pose","dst":"recorder","msg":"meander_core::CuPose2"},{"src":"planner","dst":"recorder","msg":"meander_core::CuPath2<2048>"},{"src":"controller","dst":"recorder","msg":"meander_core::CuTwist2"},{"src":"sim/pose","dst":"telemetry","msg":"meander_core::CuPose2"},{"src":"planner","dst":"telemetry","msg":"meander_core::CuPath2<2048>"},{"src":"controller","dst":"telemetry","msg":"meander_core::CuTwist2"}]},"streams":[{"id":"costmap","msg":"meander_costmap::CuCostmap2","kind":"occupancy_grid","direction":"out","frame":"map","fields":[{"name":"width","type":"u32"},{"name":"height","type":"u32"},{"name":"resolution","type":"f64","unit":"m"},{"name":"origin","type":"vec2","unit":"m"},{"name":"costs","type":"u8[]"}],"hints":{"in3d":true}},{"id":"pose","msg":"meander_core::CuPose2","kind":"pose","direction":"out","frame":"map","fields":[{"name":"x","type":"f64","unit":"m"},{"name":"y","type":"f64","unit":"m"},{"name":"theta","type":"f64","unit":"rad"}],"hints":{"color":"#34d399","in3d":true}},{"id":"path","msg":"meander_core::CuPath2","kind":"path","direction":"out","frame":"map","fields":[{"name":"poses","type":"pose2[]","unit":"m"}],"hints":{"color":"#a78bfa","in3d":true}}],"controls":[]}"##
         .to_string()
 }
 
@@ -365,6 +365,14 @@ mod tests {
         }
         // No uplink: nothing declared, so Studio renders no control forms.
         assert!(json.contains("\"controls\":[]"));
+        // The graph mirrors every cnx in copperconfig.ron, recorder included.
+        for edge in [
+            "\"src\":\"sim/pose\",\"dst\":\"recorder\"",
+            "\"src\":\"planner\",\"dst\":\"recorder\"",
+            "\"src\":\"controller\",\"dst\":\"recorder\"",
+        ] {
+            assert!(json.contains(edge), "missing graph edge {edge}");
+        }
     }
 
     #[test]
