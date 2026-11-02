@@ -1,0 +1,7 @@
+# CodeRabbit reviews are on request only: automatic review on every PR
+# and push burns paid review quota. To get a review, comment
+# `@coderabbitai review` on the PR.
+# Docs: https://docs.coderabbit.ai/reference/configuration
+reviews:
+  auto_review:
+    enabled: false
