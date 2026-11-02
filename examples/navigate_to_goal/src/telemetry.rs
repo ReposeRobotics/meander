@@ -1,9 +1,12 @@
 //! App-local sink: streams the run to Studio over Server-Sent Events.
 //!
-//! Serves `GET /events` on `127.0.0.1:<port>`: one `map` event (costmap,
-//! start, goal) when a client connects, then `state` events (pose, twist,
-//! planned path) whenever the robot moves. Studio's Drive tab connects
-//! here in Live mode and drives its 3D robot from these events.
+//! Serves `GET /studio/describe` and `GET /events` on `<host>:<port>`.
+//! The describe document is the app's self-description for the Studio
+//! Copper viewer (semantic-kind streams, frames, Copper graph); it is
+//! also sent as the first `describe` event on `/events`, followed by one
+//! `map` event (costmap) and then `state` events (pose, twist, planned
+//! path) whenever the robot moves. Studio renders all of it with generic
+//! displays — no per-app Studio code.
 
 use cu29::prelude::*;
 use cu29::units::si::angular_velocity::radian_per_second;
@@ -75,6 +78,8 @@ pub struct CuTelemetrySink {
     #[reflect(ignore)]
     map_event: String,
     #[reflect(ignore)]
+    describe_json: String,
+    #[reflect(ignore)]
     shared: Arc<Mutex<Shared>>,
     #[reflect(ignore)]
     running: Arc<AtomicBool>,
@@ -100,6 +105,17 @@ impl CuTelemetrySink {
             path.join(",")
         )
     }
+}
+
+/// Self-description for the Studio Copper viewer (`studio: 1`).
+///
+/// Stream ids match what Studio's SSE adapter publishes on its bus
+/// (`costmap`, `pose`, `path`); the graph mirrors `copperconfig.ron`.
+/// No controls are declared: the app accepts no uplink commands, and
+/// Studio's control forms only render what is declared here.
+fn describe_json() -> String {
+    r##"{"studio":1,"app":{"id":"meander-nav","name":"Meander navigate-to-goal"},"frames":[{"id":"map"},{"id":"base_link","parent":"map"}],"assets":[],"graph":{"tasks":[{"id":"planner","type":"meander_planner::CuPlannerTask<200, 200, 2048>"},{"id":"controller","type":"meander_controller::CuPurePursuitTask<2048>"},{"id":"recorder","type":"tasks::CuNavigationRecorder"},{"id":"telemetry","type":"telemetry::CuTelemetrySink"}],"bridges":[{"id":"sim","type":"meander_example_diff_drive::CuDiffDriveSimBridge"},{"id":"telemetry-sse","type":"studio::SseBridge"}],"connections":[{"src":"sim/pose","dst":"planner","msg":"meander_core::CuPose2"},{"src":"sim/pose","dst":"controller","msg":"meander_core::CuPose2"},{"src":"planner","dst":"controller","msg":"meander_core::CuPath2<2048>"},{"src":"controller","dst":"sim/twist","msg":"meander_core::CuTwist2"},{"src":"sim/pose","dst":"recorder","msg":"meander_core::CuPose2"},{"src":"planner","dst":"recorder","msg":"meander_core::CuPath2<2048>"},{"src":"controller","dst":"recorder","msg":"meander_core::CuTwist2"},{"src":"sim/pose","dst":"telemetry","msg":"meander_core::CuPose2"},{"src":"planner","dst":"telemetry","msg":"meander_core::CuPath2<2048>"},{"src":"controller","dst":"telemetry","msg":"meander_core::CuTwist2"}]},"streams":[{"id":"costmap","msg":"meander_costmap::CuCostmap2","kind":"occupancy_grid","direction":"out","frame":"map","fields":[{"name":"width","type":"u32"},{"name":"height","type":"u32"},{"name":"resolution","type":"f64","unit":"m"},{"name":"origin","type":"vec2","unit":"m"},{"name":"costs","type":"u8[]"}],"hints":{"in3d":true}},{"id":"pose","msg":"meander_core::CuPose2","kind":"pose","direction":"out","frame":"map","fields":[{"name":"x","type":"f64","unit":"m"},{"name":"y","type":"f64","unit":"m"},{"name":"theta","type":"f64","unit":"rad"}],"hints":{"color":"#34d399","in3d":true}},{"id":"path","msg":"meander_core::CuPath2","kind":"path","direction":"out","frame":"map","fields":[{"name":"poses","type":"pose2[]","unit":"m"}],"hints":{"color":"#a78bfa","in3d":true}}],"controls":[]}"##
+        .to_string()
 }
 
 impl CuSinkTask for CuTelemetrySink {
@@ -139,6 +155,7 @@ impl CuSinkTask for CuTelemetrySink {
             host: params.host,
             port: params.port,
             map_event,
+            describe_json: describe_json(),
             shared: Arc::new(Mutex::new(Shared::default())),
             running: Arc::new(AtomicBool::new(false)),
         })
@@ -148,17 +165,18 @@ impl CuSinkTask for CuTelemetrySink {
         let listener = TcpListener::bind((self.host.as_str(), self.port))
             .map_err(|e| CuError::new_with_cause("telemetry: cannot bind event port", e))?;
         self.running.store(true, Ordering::Release);
-        let (shared, running, map_event) = (
+        let (shared, running, map_event, describe_json) = (
             Arc::clone(&self.shared),
             Arc::clone(&self.running),
             self.map_event.clone(),
+            self.describe_json.clone(),
         );
         std::thread::Builder::new()
             .name("navigate-telemetry".into())
-            .spawn(move || serve(listener, shared, map_event, running))
+            .spawn(move || serve(listener, shared, map_event, describe_json, running))
             .map_err(|e| CuError::new_with_cause("telemetry: cannot start server", e))?;
         println!(
-            "telemetry on http://{}:{}/events (Studio Drive tab, Live mode)",
+            "telemetry on http://{}:{} (/studio/describe + /events for the Studio Copper viewer)",
             self.host, self.port
         );
         Ok(())
@@ -207,6 +225,7 @@ fn serve(
     listener: TcpListener,
     shared: Arc<Mutex<Shared>>,
     map_event: String,
+    describe_json: String,
     running: Arc<AtomicBool>,
 ) {
     for stream in listener.incoming() {
@@ -214,9 +233,14 @@ fn serve(
             return;
         }
         let Ok(stream) = stream else { continue };
-        let (shared, running, map_event) =
-            (Arc::clone(&shared), Arc::clone(&running), map_event.clone());
-        let _ = std::thread::spawn(move || client(stream, shared, map_event, running));
+        let (shared, running, map_event, describe_json) = (
+            Arc::clone(&shared),
+            Arc::clone(&running),
+            map_event.clone(),
+            describe_json.clone(),
+        );
+        let _ =
+            std::thread::spawn(move || client(stream, shared, map_event, describe_json, running));
     }
 }
 
@@ -224,23 +248,38 @@ fn client(
     mut stream: TcpStream,
     shared: Arc<Mutex<Shared>>,
     map_event: String,
+    describe_json: String,
     running: Arc<AtomicBool>,
 ) {
     let _ = stream.set_nodelay(true);
     // Drain the request line/headers before replying.
     let mut request = [0u8; 1024];
     let _ = stream.read(&mut request);
+    if request.starts_with(b"GET /studio/describe") {
+        let _ = stream.write_all(
+            format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nAccess-Control-Allow-Origin: *\r\n\r\n{}",
+                describe_json.len(),
+                describe_json
+            )
+            .as_bytes(),
+        );
+        return;
+    }
     if !request.starts_with(b"GET /events") {
         let _ = stream.write_all(
             b"HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nAccess-Control-Allow-Origin: *\r\n\r\n",
         );
         return;
     }
+    // The description is the first event on the stream, then the map.
+    let describe_event = format!("event: describe\ndata: {describe_json}\n\n");
     if stream
         .write_all(
             b"HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nCache-Control: no-cache\r\nAccess-Control-Allow-Origin: *\r\n\r\n",
         )
         .is_err()
+        || stream.write_all(describe_event.as_bytes()).is_err()
         || stream.write_all(map_event.as_bytes()).is_err()
     {
         return;
@@ -305,6 +344,35 @@ mod tests {
         assert_eq!(base64(b"fo"), "Zm8=");
         assert_eq!(base64(b"foo"), "Zm9v");
         assert_eq!(base64(&[254, 255]), "/v8=");
+    }
+
+    #[test]
+    fn test_describe_matches_studio_contract() {
+        let json = describe_json();
+        // Studio's validateDescription: studio==1, app.id, stream id+kind.
+        assert!(json.starts_with("{\"studio\":1,"));
+        assert!(json.contains("\"app\":{\"id\":\"meander-nav\""));
+        // Stream ids are the ones Studio's SSE adapter publishes on its bus.
+        for stream in ["\"id\":\"costmap\"", "\"id\":\"pose\"", "\"id\":\"path\""] {
+            assert!(json.contains(stream), "missing stream {stream}");
+        }
+        for kind in [
+            "\"kind\":\"occupancy_grid\"",
+            "\"kind\":\"pose\"",
+            "\"kind\":\"path\"",
+        ] {
+            assert!(json.contains(kind), "missing kind {kind}");
+        }
+        // No uplink: nothing declared, so Studio renders no control forms.
+        assert!(json.contains("\"controls\":[]"));
+        // The graph mirrors every cnx in copperconfig.ron, recorder included.
+        for edge in [
+            "\"src\":\"sim/pose\",\"dst\":\"recorder\"",
+            "\"src\":\"planner\",\"dst\":\"recorder\"",
+            "\"src\":\"controller\",\"dst\":\"recorder\"",
+        ] {
+            assert!(json.contains(edge), "missing graph edge {edge}");
+        }
     }
 
     #[test]
