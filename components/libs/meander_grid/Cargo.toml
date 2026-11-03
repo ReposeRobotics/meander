@@ -21,7 +21,7 @@ bincode = { workspace = true }
 cu29 = { workspace = true }
 libm = { workspace = true }
 serde = { workspace = true }
-meander-core = { version = "0.1.0", path = "../meander_core", default-features = false }
+meander-core = { version = "0.2.0", path = "../meander_core", default-features = false }
 
 [features]
 default = ["std"]

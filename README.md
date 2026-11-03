@@ -4,7 +4,7 @@ Deterministic, allocation-free mobile robot navigation for
 [copper-rs](https://github.com/copper-project/copper-rs) (`cu29`), in the
 spirit of ROS 2 Nav2.
 
-Meander is early. Version 0.1 covers the foundations only:
+Meander is early. Version 0.2 covers the foundations only:
 
 | Crate | What it provides |
 |---|---|
@@ -39,6 +39,7 @@ See [ROADMAP.md](ROADMAP.md) for what comes next.
 
 | Meander | cu29 | MSRV |
 |---|---|---|
+| 0.2 | 1.3 | 1.95 |
 | 0.1 | 1.3 | 1.95 |
 
 ## Development
