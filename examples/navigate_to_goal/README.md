@@ -45,10 +45,10 @@ sink serves, on one port (18765 by default):
 
 - `GET /studio/describe` — the self-description (`studio: 1`): frames
   (`map`, `base_link`), the Copper graph from `copperconfig.ron`, and
-  three streams — `costmap` (`occupancy_grid`), `pose` (`pose`), and
+  four streams — `occupancy` (saved map, shown at an illustrative 0.5 m height), `costmap` (`occupancy_grid`), `pose` (`pose`), and
   `path` (`path`). No controls are declared: the app takes no uplink.
 - `GET /events` — Server-Sent Events: the same description as the first
-  `describe` event, one `map` event (inflated costmap), then `state`
+  `describe` event, one `map` event (inflated costmap), an `occupancy` event (saved map), then `state`
   events (pose, twist, planned path) as the robot moves.
 
 Studio is a separate repository — it is not part of this checkout.

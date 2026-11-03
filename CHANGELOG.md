@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Navigate-to-goal streams its saved occupancy map for 3D display in Studio.
+
 ### Changed
 
 - CI/review cost controls: CodeRabbit no longer auto-reviews (request one
