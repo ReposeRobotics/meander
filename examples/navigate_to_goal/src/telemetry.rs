@@ -78,6 +78,8 @@ pub struct CuTelemetrySink {
     #[reflect(ignore)]
     map_event: String,
     #[reflect(ignore)]
+    occupancy_event: String,
+    #[reflect(ignore)]
     describe_json: String,
     #[reflect(ignore)]
     shared: Arc<Mutex<Shared>>,
@@ -114,7 +116,7 @@ impl CuTelemetrySink {
 /// No controls are declared: the app accepts no uplink commands, and
 /// Studio's control forms only render what is declared here.
 fn describe_json() -> String {
-    r##"{"studio":1,"app":{"id":"meander-nav","name":"Meander navigate-to-goal"},"frames":[{"id":"map"},{"id":"base_link","parent":"map"}],"assets":[],"graph":{"tasks":[{"id":"planner","type":"meander_planner::CuPlannerTask<200, 200, 2048>"},{"id":"controller","type":"meander_controller::CuPurePursuitTask<2048>"},{"id":"recorder","type":"tasks::CuNavigationRecorder"},{"id":"telemetry","type":"telemetry::CuTelemetrySink"}],"bridges":[{"id":"sim","type":"meander_example_diff_drive::CuDiffDriveSimBridge"},{"id":"telemetry-sse","type":"studio::SseBridge"}],"connections":[{"src":"sim/pose","dst":"planner","msg":"meander_core::CuPose2"},{"src":"sim/pose","dst":"controller","msg":"meander_core::CuPose2"},{"src":"planner","dst":"controller","msg":"meander_core::CuPath2<2048>"},{"src":"controller","dst":"sim/twist","msg":"meander_core::CuTwist2"},{"src":"sim/pose","dst":"recorder","msg":"meander_core::CuPose2"},{"src":"planner","dst":"recorder","msg":"meander_core::CuPath2<2048>"},{"src":"controller","dst":"recorder","msg":"meander_core::CuTwist2"},{"src":"sim/pose","dst":"telemetry","msg":"meander_core::CuPose2"},{"src":"planner","dst":"telemetry","msg":"meander_core::CuPath2<2048>"},{"src":"controller","dst":"telemetry","msg":"meander_core::CuTwist2"}]},"streams":[{"id":"costmap","msg":"meander_costmap::CuCostmap2","kind":"occupancy_grid","direction":"out","frame":"map","fields":[{"name":"width","type":"u32"},{"name":"height","type":"u32"},{"name":"resolution","type":"f64","unit":"m"},{"name":"origin","type":"vec2","unit":"m"},{"name":"costs","type":"u8[]"}],"hints":{"in3d":true}},{"id":"pose","msg":"meander_core::CuPose2","kind":"pose","direction":"out","frame":"map","fields":[{"name":"x","type":"f64","unit":"m"},{"name":"y","type":"f64","unit":"m"},{"name":"theta","type":"f64","unit":"rad"}],"hints":{"color":"#34d399","in3d":true}},{"id":"path","msg":"meander_core::CuPath2","kind":"path","direction":"out","frame":"map","fields":[{"name":"poses","type":"pose2[]","unit":"m"}],"hints":{"color":"#a78bfa","in3d":true}}],"controls":[]}"##
+    r##"{"studio":1,"app":{"id":"meander-nav","name":"Meander navigate-to-goal"},"frames":[{"id":"map"},{"id":"base_link","parent":"map"}],"assets":[],"graph":{"tasks":[{"id":"planner","type":"meander_planner::CuPlannerTask<200, 200, 2048>"},{"id":"controller","type":"meander_controller::CuPurePursuitTask<2048>"},{"id":"recorder","type":"tasks::CuNavigationRecorder"},{"id":"telemetry","type":"telemetry::CuTelemetrySink"}],"bridges":[{"id":"sim","type":"meander_example_diff_drive::CuDiffDriveSimBridge"},{"id":"telemetry-sse","type":"studio::SseBridge"}],"connections":[{"src":"sim/pose","dst":"planner","msg":"meander_core::CuPose2"},{"src":"sim/pose","dst":"controller","msg":"meander_core::CuPose2"},{"src":"planner","dst":"controller","msg":"meander_core::CuPath2<2048>"},{"src":"controller","dst":"sim/twist","msg":"meander_core::CuTwist2"},{"src":"sim/pose","dst":"recorder","msg":"meander_core::CuPose2"},{"src":"planner","dst":"recorder","msg":"meander_core::CuPath2<2048>"},{"src":"controller","dst":"recorder","msg":"meander_core::CuTwist2"},{"src":"sim/pose","dst":"telemetry","msg":"meander_core::CuPose2"},{"src":"planner","dst":"telemetry","msg":"meander_core::CuPath2<2048>"},{"src":"controller","dst":"telemetry","msg":"meander_core::CuTwist2"}]},"streams":[{"id":"occupancy","msg":"meander_grid::CuOccupancyGrid","kind":"occupancy_grid_3d","frame":"map","hints":{"in3d":true}},{"id":"costmap","msg":"meander_costmap::CuCostmap2","kind":"occupancy_grid","direction":"out","frame":"map","fields":[{"name":"width","type":"u32"},{"name":"height","type":"u32"},{"name":"resolution","type":"f64","unit":"m"},{"name":"origin","type":"vec2","unit":"m"},{"name":"costs","type":"u8[]"}],"hints":{"in3d":true}},{"id":"pose","msg":"meander_core::CuPose2","kind":"pose","direction":"out","frame":"map","fields":[{"name":"x","type":"f64","unit":"m"},{"name":"y","type":"f64","unit":"m"},{"name":"theta","type":"f64","unit":"rad"}],"hints":{"color":"#34d399","in3d":true}},{"id":"path","msg":"meander_core::CuPath2","kind":"path","direction":"out","frame":"map","fields":[{"name":"poses","type":"pose2[]","unit":"m"}],"hints":{"color":"#a78bfa","in3d":true}}],"controls":[]}"##
         .to_string()
 }
 
@@ -151,7 +153,25 @@ impl CuSinkTask for CuTelemetrySink {
             origin.y.get::<meter>(),
             base64(&costs),
         );
+        let occupancy: Vec<u8> = map
+            .cells()
+            .iter()
+            .flatten()
+            .map(|cell| match cell {
+                meander_grid::CuOccupancy::Unknown => 127,
+                meander_grid::CuOccupancy::Free => 0,
+                meander_grid::CuOccupancy::Occupied => 255,
+            })
+            .collect();
+        let occupancy_event = format!(
+            "event: occupancy\ndata: {{\"width\":{W},\"height\":{H},\"resolution\":{},\"origin\":[{},{}],\"costs\":\"{}\"}}\n\n",
+            map.geometry().resolution.get::<meter>(),
+            origin.x.get::<meter>(),
+            origin.y.get::<meter>(),
+            base64(&occupancy),
+        );
         Ok(Self {
+            occupancy_event,
             host: params.host,
             port: params.port,
             map_event,
@@ -165,15 +185,25 @@ impl CuSinkTask for CuTelemetrySink {
         let listener = TcpListener::bind((self.host.as_str(), self.port))
             .map_err(|e| CuError::new_with_cause("telemetry: cannot bind event port", e))?;
         self.running.store(true, Ordering::Release);
-        let (shared, running, map_event, describe_json) = (
+        let (shared, running, map_event, occupancy_event, describe_json) = (
             Arc::clone(&self.shared),
             Arc::clone(&self.running),
             self.map_event.clone(),
+            self.occupancy_event.clone(),
             self.describe_json.clone(),
         );
         std::thread::Builder::new()
             .name("navigate-telemetry".into())
-            .spawn(move || serve(listener, shared, map_event, describe_json, running))
+            .spawn(move || {
+                serve(
+                    listener,
+                    shared,
+                    map_event,
+                    occupancy_event,
+                    describe_json,
+                    running,
+                )
+            })
             .map_err(|e| CuError::new_with_cause("telemetry: cannot start server", e))?;
         println!(
             "telemetry on http://{}:{} (/studio/describe + /events for the Studio Copper viewer)",
@@ -225,6 +255,7 @@ fn serve(
     listener: TcpListener,
     shared: Arc<Mutex<Shared>>,
     map_event: String,
+    occupancy_event: String,
     describe_json: String,
     running: Arc<AtomicBool>,
 ) {
@@ -233,14 +264,23 @@ fn serve(
             return;
         }
         let Ok(stream) = stream else { continue };
-        let (shared, running, map_event, describe_json) = (
+        let (shared, running, map_event, occupancy_event, describe_json) = (
             Arc::clone(&shared),
             Arc::clone(&running),
             map_event.clone(),
+            occupancy_event.clone(),
             describe_json.clone(),
         );
-        let _ =
-            std::thread::spawn(move || client(stream, shared, map_event, describe_json, running));
+        let _ = std::thread::spawn(move || {
+            client(
+                stream,
+                shared,
+                map_event,
+                occupancy_event,
+                describe_json,
+                running,
+            )
+        });
     }
 }
 
@@ -248,6 +288,7 @@ fn client(
     mut stream: TcpStream,
     shared: Arc<Mutex<Shared>>,
     map_event: String,
+    occupancy_event: String,
     describe_json: String,
     running: Arc<AtomicBool>,
 ) {
@@ -281,6 +322,7 @@ fn client(
         .is_err()
         || stream.write_all(describe_event.as_bytes()).is_err()
         || stream.write_all(map_event.as_bytes()).is_err()
+        || stream.write_all(occupancy_event.as_bytes()).is_err()
     {
         return;
     }
